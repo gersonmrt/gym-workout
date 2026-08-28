@@ -166,6 +166,27 @@
     from{opacity:0; transform:translateY(6px);}
     to{opacity:1; transform:translateY(0);}
   }
+  .ex-card.complete{
+    background:var(--chalk-dim);
+    border-color:var(--chalk);
+    transition:background .25s ease, border-color .25s ease;
+  }
+  .ex-card.complete .ex-num{
+    background:rgba(0,0,0,0.18); color:#EFF4CF;
+  }
+  .ex-card.complete .stat-label{color:#D8E39A;}
+  .ex-card.complete .stat-value{color:#F5FAE0;}
+  .ex-card.complete .ex-note{
+    background:rgba(0,0,0,0.16); border-left-color:#EFF4CF; color:#EFF4CF;
+  }
+  .ex-card.complete .reps-pill{
+    background:rgba(0,0,0,0.18); border-color:rgba(255,255,255,0.2); color:#F5FAE0;
+  }
+  .ex-card.complete .sup-item{border-bottom-color:rgba(255,255,255,0.14);}
+  .ex-card.complete .rnd{border-color:rgba(255,255,255,0.35);}
+  .ex-card.complete .rnd.done{
+    background:#EFF4CF; border-color:#EFF4CF; color:var(--chalk-dim);
+  }
   .ex-top{display:flex; gap:10px; align-items:flex-start;}
   .ex-num{
     font-family:'JetBrains Mono',monospace;
@@ -361,7 +382,7 @@
 <body>
 
 <header>
-  <div class="eyebrow">Gerson · academia</div>
+  <div class="eyebrow">Academia</div>
   <div class="title-row">
     <h1>Treino</h1>
     <button class="import-btn" onclick="openImportModal()">Importar</button>
@@ -1001,6 +1022,14 @@ function renderExercise(day, ex, keyId, num){
       '</div>';
   }
 
+  function updateCardCompletion(){
+    let allDone = ex.rounds > 0;
+    for(let r=0;r<ex.rounds;r++){
+      if(!progress[dayKey(day.id, keyId, r)]){ allDone = false; break; }
+    }
+    card.classList.toggle('complete', allDone);
+  }
+
   const roundsWrap = document.createElement('div');
   roundsWrap.className = 'rounds';
   for(let r=0;r<ex.rounds;r++){
@@ -1018,6 +1047,7 @@ function renderExercise(day, ex, keyId, num){
       dot.classList.add('pop');
       setTimeout(()=>dot.classList.remove('pop'), 220);
       renderTabs();
+      updateCardCompletion();
       if(!wasDone && r < ex.rounds-1){
         startTimer(restToSeconds(ex.rest));
       }
@@ -1025,6 +1055,7 @@ function renderExercise(day, ex, keyId, num){
     roundsWrap.appendChild(dot);
   }
   card.appendChild(roundsWrap);
+  updateCardCompletion();
   return card;
 }
 

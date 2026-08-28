@@ -68,12 +68,18 @@
     height:100%; width:0%; background:linear-gradient(90deg,var(--chalk-dim),var(--chalk));
     border-radius:3px; transition:width .3s ease;
   }
-  .wakelock-status{
-    margin-top:8px; font-size:11px; color:var(--text-3);
-    cursor:pointer;
+  .wake-toggle{
+    margin-top:8px;
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--surface-2); border:1px solid var(--border-strong);
+    color:var(--text-2); font-family:'JetBrains Mono',monospace;
+    font-size:11px; font-weight:700; letter-spacing:0.04em;
+    padding:5px 12px; border-radius:20px;
   }
-  .wakelock-status.ok{color:var(--chalk);}
-  .wakelock-status.warn{color:var(--rust);}
+  .wake-toggle:active{transform:scale(0.97);}
+  .wake-toggle.on{
+    background:var(--chalk-dim); border-color:var(--chalk); color:#EFF4CF;
+  }
 
   .day-tabs{
     display:grid; grid-template-columns:repeat(auto-fit, minmax(64px,1fr)); gap:8px;
@@ -392,7 +398,7 @@
     <span class="day-fraction mono" id="dayFraction"></span>
   </div>
   <div class="day-progress-bar"><div class="day-progress-fill" id="dayProgressFill"></div></div>
-  <div class="wakelock-status" id="wakeLockStatus" onclick="requestWakeLock()">Verificando tela ativa…</div>
+  <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
 </header>
 
 <div class="day-tabs" id="dayTabs"></div>
@@ -1151,32 +1157,49 @@ function flashScreen(){
   setTimeout(()=> el.classList.remove('active'), 2200);
 }
 
-function setWakeLockStatus(text, state){
-  const el = document.getElementById('wakeLockStatus');
-  if(!el) return;
-  el.textContent = text;
-  el.classList.toggle('ok', state === 'ok');
-  el.classList.toggle('warn', state === 'warn');
+function setWakeToggleUI(){
+  const btn = document.getElementById('wakeToggleBtn');
+  if(!btn) return;
+  const on = wakeLock !== null;
+  btn.textContent = 'Tela: ' + (on ? 'ON' : 'OFF');
+  btn.classList.toggle('on', on);
 }
 
 let wakeLock = null;
+let wakeLockWanted = true;
+
 async function requestWakeLock(){
   if(!('wakeLock' in navigator)){
-    setWakeLockStatus('Tela ativa: navegador não suporta (toque para tentar de novo)', 'warn');
+    wakeLock = null;
+    setWakeToggleUI();
     return;
   }
   try{
     wakeLock = await navigator.wakeLock.request('screen');
-    setWakeLockStatus('Tela ativa: ligada ✓', 'ok');
     wakeLock.addEventListener('release', ()=>{
-      setWakeLockStatus('Tela ativa: o sistema desligou — toque para reativar', 'warn');
+      wakeLock = null;
+      setWakeToggleUI();
     });
   }catch(e){
-    setWakeLockStatus('Tela ativa: falhou ('+(e && e.name ? e.name : 'erro')+') — toque para tentar', 'warn');
+    wakeLock = null;
+  }
+  setWakeToggleUI();
+}
+
+async function toggleWakeLock(){
+  if(wakeLock){
+    wakeLockWanted = false;
+    try{ await wakeLock.release(); }catch(e){}
+    wakeLock = null;
+    setWakeToggleUI();
+  } else {
+    wakeLockWanted = true;
+    await requestWakeLock();
   }
 }
+
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible'){
+  if(document.visibilityState === 'visible' && wakeLockWanted && wakeLock === null){
     requestWakeLock();
   }
 });

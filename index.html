@@ -540,11 +540,27 @@ const DEFAULT_DATA = [
 let DATA = DEFAULT_DATA;
 
 const memoryStore = {};
-const storageAPI = (typeof window !== 'undefined' && window.storage) ? window.storage : {
-  async get(key){ return Object.prototype.hasOwnProperty.call(memoryStore,key) ? {key, value:memoryStore[key]} : null; },
-  async set(key, value){ memoryStore[key] = value; return {key, value}; },
-  async delete(key){ delete memoryStore[key]; return {key, deleted:true}; }
+const localStorageAPI = {
+  async get(key){
+    try{
+      const value = localStorage.getItem(key);
+      return value !== null ? {key, value} : null;
+    }catch(e){
+      return Object.prototype.hasOwnProperty.call(memoryStore,key) ? {key, value:memoryStore[key]} : null;
+    }
+  },
+  async set(key, value){
+    try{ localStorage.setItem(key, value); }
+    catch(e){ memoryStore[key] = value; }
+    return {key, value};
+  },
+  async delete(key){
+    try{ localStorage.removeItem(key); }
+    catch(e){ delete memoryStore[key]; }
+    return {key, deleted:true};
+  }
 };
+const storageAPI = (typeof window !== 'undefined' && window.storage) ? window.storage : localStorageAPI;
 
 async function loadCustomWorkout(){
   try{

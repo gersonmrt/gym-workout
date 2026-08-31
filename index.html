@@ -428,6 +428,7 @@
     color:var(--text-3); font-size:11px; text-decoration:underline;
   }
 
+  [hidden]{display:none !important;}
   .auth-screen{
     min-height:100vh; display:flex; align-items:center; justify-content:center;
     padding:24px 16px;
@@ -477,7 +478,19 @@
     display:block; margin:16px auto 0; background:none; border:none;
     color:var(--text-2); font-size:12px; text-decoration:underline;
   }
-
+  .invites-list{margin-top:16px; border-top:1px solid var(--border); padding-top:10px;}
+  .invite-row{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px; padding:8px 0; border-bottom:1px solid var(--border);
+    font-size:13px;
+  }
+  .invite-row:last-child{border-bottom:none;}
+  .invite-email{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .invite-remove{
+    flex-shrink:0; background:none; border:1px solid var(--border-strong);
+    color:var(--text-2); font-size:11px; padding:4px 10px; border-radius:14px;
+  }
+  .invite-empty{color:var(--text-3); font-size:12px; padding:6px 0;}
 </style>
 </head>
 <body>
@@ -519,6 +532,7 @@
   <div class="day-progress-bar"><div class="day-progress-fill" id="dayProgressFill"></div></div>
   <div class="header-toggles">
     <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
+    <button class="wake-toggle" id="adminBtn" onclick="openAdminModal()" hidden>Admin</button>
     <button class="wake-toggle" id="logoutBtn">Sair</button>
   </div>
   <div class="user-email" id="userEmailLabel"></div>
@@ -567,6 +581,22 @@
     <button class="btn-confirm-import" id="confirmImportBtn" style="display:none;" onclick="confirmImport()">Confirmar e substituir treino</button>
     <button class="modal-restore" onclick="restoreDefault()">Restaurar treino padrão original</button>
     <button class="modal-restore" onclick="closeImportModal()">Fechar</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="adminOverlay">
+  <div class="modal-panel">
+    <div class="modal-title">Convites</div>
+    <div class="modal-hint">Só e-mails convidados aqui conseguem criar conta e usar o app.</div>
+
+    <label for="inviteEmailInput" style="display:block; font-size:12px; font-weight:600; color:var(--text-2); margin-bottom:6px;">Convidar por e-mail</label>
+    <input type="email" id="inviteEmailInput" placeholder="pessoa@exemplo.com" style="width:100%; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:8px; color:var(--text); font-size:14px; margin-bottom:8px;">
+    <div class="auth-error" id="adminError"></div>
+    <button class="btn-confirm-import" onclick="addInvite()">Enviar convite</button>
+
+    <div class="invites-list" id="invitesList"></div>
+
+    <button class="modal-restore" onclick="closeAdminModal()">Fechar</button>
   </div>
 </div>
 
@@ -1471,6 +1501,18 @@ function translateAuthError(code){
   return map[code] || 'Não foi possível entrar. Tente novamente.';
 }
 
+const ADMIN_EMAIL = 'gersonmrt@gmail.com';
+function isAdminUser(user){
+  return !!user && !!user.email && user.email.toLowerCase() === ADMIN_EMAIL;
+}
+async function checkInviteExists(email){
+  if(!email) return false;
+  try{
+    const doc = await db.collection('invites').doc(email).get();
+    return doc.exists;
+  }catch(e){ return false; }
+}
+
 document.getElementById('authSwitchBtn').onclick = ()=>{
   authMode = authMode === 'login' ? 'signup' : 'login';
   document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? 'Entrar' : 'Criar conta';
@@ -1487,6 +1529,13 @@ document.getElementById('authForm').addEventListener('submit', async (e)=>{
     if(authMode === 'login'){
       await auth.signInWithEmailAndPassword(email, password);
     } else {
+      if(email.toLowerCase() !== ADMIN_EMAIL){
+        const invited = await checkInviteExists(email);
+        if(!invited){
+          setAuthError('Este e-mail não tem convite para criar conta. Peça um convite ao administrador.');
+          return;
+        }
+      }
       await auth.createUserWithEmailAndPassword(email, password);
     }
   }catch(err){
@@ -1511,9 +1560,16 @@ document.getElementById('logoutBtn').onclick = async ()=>{
 auth.onAuthStateChanged(async (user)=>{
   currentUser = user;
   if(user){
+    const allowed = isAdminUser(user) || await checkInviteExists(user.email);
+    if(!allowed){
+      setAuthError('Sua conta não tem convite para usar este app. Peça um convite ao administrador.');
+      await auth.signOut();
+      return;
+    }
     document.getElementById('authScreen').hidden = true;
     document.getElementById('appRoot').hidden = false;
     document.getElementById('userEmailLabel').textContent = user.email || '';
+    document.getElementById('adminBtn').hidden = !isAdminUser(user);
     setAuthError('');
     document.getElementById('authForm').reset();
     try{
@@ -1529,6 +1585,60 @@ auth.onAuthStateChanged(async (user)=>{
     document.getElementById('appRoot').hidden = true;
   }
 });
+
+function openAdminModal(){
+  document.getElementById('adminOverlay').classList.add('open');
+  document.getElementById('inviteEmailInput').value = '';
+  document.getElementById('adminError').textContent = '';
+  loadInvitesList();
+}
+function closeAdminModal(){
+  document.getElementById('adminOverlay').classList.remove('open');
+}
+async function loadInvitesList(){
+  const listEl = document.getElementById('invitesList');
+  listEl.innerHTML = '<div class="invite-empty">Carregando...</div>';
+  try{
+    const snap = await db.collection('invites').orderBy('createdAt', 'desc').get();
+    if(snap.empty){
+      listEl.innerHTML = '<div class="invite-empty">Nenhum convite enviado ainda.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    snap.forEach(doc=>{
+      const row = document.createElement('div');
+      row.className = 'invite-row';
+      row.innerHTML = '<span class="invite-email">'+doc.id+'</span>'+
+        '<button class="invite-remove" type="button">Remover</button>';
+      row.querySelector('.invite-remove').onclick = ()=> removeInvite(doc.id);
+      listEl.appendChild(row);
+    });
+  }catch(e){
+    listEl.innerHTML = '<div class="invite-empty">Não foi possível carregar os convites.</div>';
+  }
+}
+async function addInvite(){
+  const errEl = document.getElementById('adminError');
+  errEl.textContent = '';
+  const email = document.getElementById('inviteEmailInput').value.trim();
+  if(!email){ errEl.textContent = 'Digite um e-mail.'; return; }
+  try{
+    await db.collection('invites').doc(email).set({
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      invitedBy: currentUser.email
+    });
+    document.getElementById('inviteEmailInput').value = '';
+    loadInvitesList();
+  }catch(e){
+    errEl.textContent = 'Não foi possível enviar o convite.';
+  }
+}
+async function removeInvite(email){
+  try{
+    await db.collection('invites').doc(email).delete();
+    loadInvitesList();
+  }catch(e){}
+}
 </script>
 </body>
 </html>

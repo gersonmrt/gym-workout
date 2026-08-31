@@ -1205,8 +1205,38 @@ let timerTotal = 0;
 let timerRemaining = 0;
 let timerPaused = false;
 
+let audioCtx = null;
+function getAudioCtx(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return null;
+  if(!audioCtx) audioCtx = new AC();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function beepTone(ctx, startTime, duration, freq){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.35, startTime + 0.015);
+  gain.gain.linearRampToValueAtTime(0, startTime + duration);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.02);
+}
+function playDoubleBeep(){
+  const ctx = audioCtx;
+  if(!ctx) return;
+  const now = ctx.currentTime;
+  beepTone(ctx, now, 0.12, 880);
+  beepTone(ctx, now + 0.18, 0.12, 880);
+}
+
 function startTimer(seconds){
   clearInterval(timerInterval);
+  getAudioCtx();
   timerTotal = seconds;
   timerRemaining = seconds;
   timerPaused = false;
@@ -1223,6 +1253,7 @@ function tickTimer(){
     document.getElementById('timerBar').classList.remove('show');
     if(navigator.vibrate) navigator.vibrate([120,60,120]);
     flashScreen();
+    playDoubleBeep();
     return;
   }
   updateTimerDisplay();

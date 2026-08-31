@@ -255,27 +255,57 @@
     border-radius:20px; padding:2px 9px;
   }
 
+  .round-row{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; margin-top:12px;
+  }
   .rounds{
-    display:flex; gap:7px; margin-top:12px; flex-wrap:wrap;
+    display:flex; gap:6px; flex-wrap:wrap; flex:1; min-width:0;
   }
   .rnd{
-    width:36px; height:36px; border-radius:50%;
+    width:28px; height:28px; border-radius:50%;
     border:1.5px solid var(--border-strong);
     background:var(--surface-2);
     display:flex; align-items:center; justify-content:center;
-    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2);
-    transition:background .15s ease, border-color .15s ease, color .15s ease;
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-2);
+    transition:background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
   }
   .rnd.done{
     background:var(--chalk-dim); border-color:var(--chalk);
-    color:#EFF4CF; font-size:14px; font-weight:700;
+    color:#EFF4CF; font-size:13px; font-weight:700;
   }
-  .rnd:active{transform:scale(0.9);}
+  .rnd.current{
+    border-color:var(--rust); color:var(--rust);
+    box-shadow:0 0 0 3px rgba(210,87,28,0.18);
+  }
   .rnd.pop{animation:rndPop .22s ease;}
   @keyframes rndPop{
     0%{transform:scale(1);}
     45%{transform:scale(1.28);}
     100%{transform:scale(1);}
+  }
+
+  .round-btn{
+    flex-shrink:0;
+    width:60px; height:60px; border-radius:50%;
+    background:var(--rust); border:2px solid var(--rust);
+    color:#2A1206;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    box-shadow:0 4px 14px rgba(210,87,28,0.35);
+    transition:background .2s ease, border-color .2s ease, color .2s ease;
+  }
+  .round-btn:active{transform:scale(0.93);}
+  .round-btn .rb-num{
+    font-family:'Oswald',sans-serif; font-size:20px; font-weight:700; line-height:1;
+  }
+  .round-btn .rb-label{
+    font-size:8px; letter-spacing:0.05em; text-transform:uppercase; opacity:0.85; margin-top:2px;
+  }
+  .round-btn.all-done{
+    background:var(--chalk-dim); border-color:var(--chalk); color:#EFF4CF;
+  }
+  .ex-card.complete .round-btn.all-done{
+    background:#EFF4CF; border-color:#EFF4CF; color:var(--chalk-dim);
   }
 
   .reset-btn{
@@ -1044,40 +1074,73 @@ function renderExercise(day, ex, keyId, num){
       '</div>';
   }
 
+  function isRoundDone(r){ return !!progress[dayKey(day.id, keyId, r)]; }
+
+  function allRoundsDone(){
+    if(ex.rounds === 0) return false;
+    for(let r=0;r<ex.rounds;r++){ if(!isRoundDone(r)) return false; }
+    return true;
+  }
+
+  function currentRoundIndex(){
+    for(let r=0;r<ex.rounds;r++){ if(!isRoundDone(r)) return r; }
+    return ex.rounds - 1;
+  }
+
   function updateCardCompletion(){
-    let allDone = ex.rounds > 0;
-    for(let r=0;r<ex.rounds;r++){
-      if(!progress[dayKey(day.id, keyId, r)]){ allDone = false; break; }
-    }
-    card.classList.toggle('complete', allDone);
+    card.classList.toggle('complete', allRoundsDone());
   }
 
   const roundsWrap = document.createElement('div');
   roundsWrap.className = 'rounds';
+  const dotEls = [];
   for(let r=0;r<ex.rounds;r++){
     const dot = document.createElement('div');
-    const k = dayKey(day.id, keyId, r);
-    const isDone = !!progress[k];
-    dot.className = 'rnd'+(isDone?' done':'');
-    dot.textContent = isDone ? '✓' : String(r+1);
-    dot.onclick = ()=>{
-      const wasDone = !!progress[k];
-      progress[k] = !wasDone;
-      saveProgress();
-      dot.classList.toggle('done');
-      dot.textContent = progress[k] ? '✓' : String(r+1);
-      dot.classList.add('pop');
-      setTimeout(()=>dot.classList.remove('pop'), 220);
-      renderTabs();
-      updateCardCompletion();
-      if(!wasDone && r < ex.rounds-1){
-        startTimer(restToSeconds(ex.rest));
-      }
-    };
+    dotEls.push(dot);
     roundsWrap.appendChild(dot);
   }
-  card.appendChild(roundsWrap);
-  updateCardCompletion();
+
+  const roundBtn = document.createElement('button');
+  roundBtn.type = 'button';
+  roundBtn.className = 'round-btn';
+  roundBtn.innerHTML = '<span class="rb-num"></span><span class="rb-label"></span>';
+
+  function refreshRounds(){
+    const allDone = allRoundsDone();
+    const current = currentRoundIndex();
+    dotEls.forEach((dot, r)=>{
+      const done = isRoundDone(r);
+      dot.className = 'rnd'+(done?' done':'')+(!allDone && r===current?' current':'');
+      dot.textContent = done ? '✓' : String(r+1);
+    });
+    roundBtn.classList.toggle('all-done', allDone);
+    roundBtn.querySelector('.rb-num').textContent = allDone ? '✓' : String(current+1);
+    roundBtn.querySelector('.rb-label').textContent = allDone ? 'feito' : ('de '+ex.rounds);
+    updateCardCompletion();
+  }
+
+  roundBtn.onclick = ()=>{
+    const current = currentRoundIndex();
+    const k = dayKey(day.id, keyId, current);
+    const wasDone = !!progress[k];
+    progress[k] = !wasDone;
+    saveProgress();
+    refreshRounds();
+    const dot = dotEls[current];
+    dot.classList.add('pop');
+    setTimeout(()=>dot.classList.remove('pop'), 220);
+    renderTabs();
+    if(!wasDone && current < ex.rounds-1){
+      startTimer(restToSeconds(ex.rest));
+    }
+  };
+
+  const roundRow = document.createElement('div');
+  roundRow.className = 'round-row';
+  roundRow.appendChild(roundsWrap);
+  if(ex.rounds > 0) roundRow.appendChild(roundBtn);
+  card.appendChild(roundRow);
+  refreshRounds();
   return card;
 }
 

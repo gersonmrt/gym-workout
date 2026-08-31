@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#121110;
@@ -68,8 +71,10 @@
     height:100%; width:0%; background:linear-gradient(90deg,var(--chalk-dim),var(--chalk));
     border-radius:3px; transition:width .3s ease;
   }
+  .header-toggles{
+    display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center;
+  }
   .wake-toggle{
-    margin-top:8px;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface-2); border:1px solid var(--border-strong);
     color:var(--text-2); font-family:'JetBrains Mono',monospace;
@@ -79,6 +84,9 @@
   .wake-toggle:active{transform:scale(0.97);}
   .wake-toggle.on{
     background:var(--chalk-dim); border-color:var(--chalk); color:#EFF4CF;
+  }
+  .user-email{
+    margin-top:6px; font-size:11px; color:var(--text-3);
   }
 
   .day-tabs{
@@ -419,9 +427,84 @@
     display:block; margin:14px auto 0; background:none; border:none;
     color:var(--text-3); font-size:11px; text-decoration:underline;
   }
+
+  .auth-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:24px 16px;
+  }
+  .auth-panel{
+    width:100%; max-width:360px;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:24px 20px; box-shadow:var(--shadow);
+  }
+  .auth-panel .eyebrow{text-align:center;}
+  .auth-title{
+    font-family:'Oswald',sans-serif; font-size:26px; font-weight:600;
+    text-transform:uppercase; text-align:center; margin:2px 0 6px;
+  }
+  .auth-sub{
+    text-align:center; color:var(--text-2); font-size:13px;
+    margin:0 0 20px;
+  }
+  .google-btn{
+    width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:600;
+    font-family:'Inter',sans-serif; background:#fff; color:#1c1e21; border:1px solid var(--border-strong);
+  }
+  .google-btn:active{background:#eee;}
+  .auth-divider{
+    display:flex; align-items:center; gap:10px; margin:18px 0;
+    color:var(--text-3); font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+  }
+  .auth-divider::before, .auth-divider::after{
+    content:''; flex:1; height:1px; background:var(--border);
+  }
+  #authForm label{
+    display:block; margin:0 0 6px; font-size:12px; font-weight:600; color:var(--text-2);
+  }
+  #authForm input{
+    width:100%; margin-bottom:14px; padding:10px 12px;
+    background:var(--surface-2); border:1px solid var(--border-strong); border-radius:8px;
+    color:var(--text); font-size:14px;
+  }
+  .auth-error{
+    color:var(--danger); font-size:12px; margin-bottom:10px; min-height:14px;
+  }
+  .auth-submit{
+    width:100%; padding:12px; border-radius:8px; font-size:14px; font-weight:600;
+    font-family:'Inter',sans-serif; background:var(--rust); border:1px solid var(--rust); color:#2A1206;
+  }
+  .auth-switch{
+    display:block; margin:16px auto 0; background:none; border:none;
+    color:var(--text-2); font-size:12px; text-decoration:underline;
+  }
+
 </style>
 </head>
 <body>
+
+<div class="auth-screen" id="authScreen">
+  <div class="auth-panel">
+    <div class="eyebrow">Academia</div>
+    <h1 class="auth-title">Treino</h1>
+    <p class="auth-sub">Entre para acessar seu treino e progresso.</p>
+
+    <button class="google-btn" id="googleSignInBtn" type="button">Continuar com Google</button>
+
+    <div class="auth-divider"><span>ou</span></div>
+
+    <form id="authForm">
+      <label for="authEmail">E-mail</label>
+      <input type="email" id="authEmail" autocomplete="email" required>
+      <label for="authPassword">Senha</label>
+      <input type="password" id="authPassword" autocomplete="current-password" required minlength="6">
+      <div class="auth-error" id="authError"></div>
+      <button type="submit" class="auth-submit" id="authSubmitBtn">Entrar</button>
+    </form>
+    <button class="auth-switch" id="authSwitchBtn" type="button">Não tem conta? Criar conta</button>
+  </div>
+</div>
+
+<div class="app-root" id="appRoot" hidden>
 
 <header>
   <div class="eyebrow">Academia</div>
@@ -434,7 +517,11 @@
     <span class="day-fraction mono" id="dayFraction"></span>
   </div>
   <div class="day-progress-bar"><div class="day-progress-fill" id="dayProgressFill"></div></div>
-  <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
+  <div class="header-toggles">
+    <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
+    <button class="wake-toggle" id="logoutBtn">Sair</button>
+  </div>
+  <div class="user-email" id="userEmailLabel"></div>
 </header>
 
 <div class="day-tabs" id="dayTabs"></div>
@@ -483,6 +570,7 @@
   </div>
 </div>
 
+</div>
 
 <script>
 const DEFAULT_DATA = [
@@ -573,42 +661,43 @@ const DEFAULT_DATA = [
 
 let DATA = DEFAULT_DATA;
 
-const memoryStore = {};
-const localStorageAPI = {
-  async get(key){
-    try{
-      const value = localStorage.getItem(key);
-      return value !== null ? {key, value} : null;
-    }catch(e){
-      return Object.prototype.hasOwnProperty.call(memoryStore,key) ? {key, value:memoryStore[key]} : null;
-    }
-  },
-  async set(key, value){
-    try{ localStorage.setItem(key, value); }
-    catch(e){ memoryStore[key] = value; }
-    return {key, value};
-  },
-  async delete(key){
-    try{ localStorage.removeItem(key); }
-    catch(e){ delete memoryStore[key]; }
-    return {key, deleted:true};
-  }
+const firebaseConfig = {
+  apiKey: "AIzaSyCq8DTg1yr_WU7ksxF7LuWjz5DknsMRzTs",
+  authDomain: "gym-workout-9ed66.firebaseapp.com",
+  projectId: "gym-workout-9ed66",
+  storageBucket: "gym-workout-9ed66.firebasestorage.app",
+  messagingSenderId: "233150649240",
+  appId: "1:233150649240:web:6be69bc2a5ea91a84f11ed"
 };
-const storageAPI = (typeof window !== 'undefined' && window.storage) ? window.storage : localStorageAPI;
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUser = null;
+
+function userDocRef(){
+  return db.collection('users').doc(currentUser.uid);
+}
+
+async function loadUserDoc(){
+  try{
+    const doc = await userDocRef().get();
+    return doc.exists ? doc.data() : {};
+  }catch(e){ return {}; }
+}
 
 async function loadCustomWorkout(){
-  try{
-    const res = await storageAPI.get('treino-custom-v1', false);
-    if(res && res.value) return JSON.parse(res.value);
-  }catch(e){}
-  return null;
+  const data = await loadUserDoc();
+  return data.customWorkout || null;
 }
 async function saveCustomWorkout(data){
-  try{ await storageAPI.set('treino-custom-v1', JSON.stringify(data), false); return true; }
+  if(!currentUser) return false;
+  try{ await userDocRef().set({customWorkout: data}, {merge:true}); return true; }
   catch(e){ return false; }
 }
 async function clearCustomWorkout(){
-  try{ await storageAPI.delete('treino-custom-v1', false); }catch(e){}
+  if(!currentUser) return;
+  try{ await userDocRef().set({customWorkout: firebase.firestore.FieldValue.delete()}, {merge:true}); }
+  catch(e){}
 }
 
 function repairMarkdownLinks(raw){
@@ -975,18 +1064,15 @@ function restToSeconds(r){
 
 let activeDay = 0;
 let progress = {};
-let storageOK = true;
 
 async function loadProgress(){
-  try{
-    const res = await storageAPI.get('treino-progress', false);
-    progress = res && res.value ? JSON.parse(res.value) : {};
-  }catch(e){ progress = {}; }
+  const data = await loadUserDoc();
+  progress = data.progress || {};
 }
 async function saveProgress(){
-  if(!storageOK) return;
-  try{ await storageAPI.set('treino-progress', JSON.stringify(progress), false); }
-  catch(e){ storageOK = false; }
+  if(!currentUser) return;
+  try{ await userDocRef().set({progress}, {merge:true}); }
+  catch(e){}
 }
 
 function dayKey(dayId, exIdx, roundIdx){ return dayId+':'+exIdx+':'+roundIdx; }
@@ -1364,15 +1450,85 @@ function renderAll(){
   renderMain();
 }
 
-(async ()=>{
+let authMode = 'login';
+
+function setAuthError(msg){
+  document.getElementById('authError').textContent = msg || '';
+}
+
+function translateAuthError(code){
+  const map = {
+    'auth/invalid-email': 'E-mail inválido.',
+    'auth/user-disabled': 'Esta conta foi desativada.',
+    'auth/user-not-found': 'E-mail ou senha incorretos.',
+    'auth/wrong-password': 'E-mail ou senha incorretos.',
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/email-already-in-use': 'Já existe uma conta com esse e-mail.',
+    'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
+    'auth/popup-closed-by-user': 'Login cancelado.',
+    'auth/network-request-failed': 'Falha de conexão. Verifique a internet.'
+  };
+  return map[code] || 'Não foi possível entrar. Tente novamente.';
+}
+
+document.getElementById('authSwitchBtn').onclick = ()=>{
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? 'Entrar' : 'Criar conta';
+  document.getElementById('authSwitchBtn').textContent = authMode === 'login' ? 'Não tem conta? Criar conta' : 'Já tem conta? Entrar';
+  setAuthError('');
+};
+
+document.getElementById('authForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  setAuthError('');
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
   try{
-    await loadProgress();
-    const custom = await loadCustomWorkout();
-    if(custom) DATA = custom;
-  }catch(e){}
-  renderAll();
-  requestWakeLock();
-})();
+    if(authMode === 'login'){
+      await auth.signInWithEmailAndPassword(email, password);
+    } else {
+      await auth.createUserWithEmailAndPassword(email, password);
+    }
+  }catch(err){
+    setAuthError(translateAuthError(err.code));
+  }
+});
+
+document.getElementById('googleSignInBtn').onclick = async ()=>{
+  setAuthError('');
+  try{
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+  }catch(err){
+    setAuthError(translateAuthError(err.code));
+  }
+};
+
+document.getElementById('logoutBtn').onclick = async ()=>{
+  try{ await auth.signOut(); }catch(e){}
+};
+
+auth.onAuthStateChanged(async (user)=>{
+  currentUser = user;
+  if(user){
+    document.getElementById('authScreen').hidden = true;
+    document.getElementById('appRoot').hidden = false;
+    document.getElementById('userEmailLabel').textContent = user.email || '';
+    setAuthError('');
+    document.getElementById('authForm').reset();
+    try{
+      await loadProgress();
+      const custom = await loadCustomWorkout();
+      DATA = custom || DEFAULT_DATA;
+      activeDay = 0;
+    }catch(e){}
+    renderAll();
+    requestWakeLock();
+  } else {
+    document.getElementById('authScreen').hidden = false;
+    document.getElementById('appRoot').hidden = true;
+  }
+});
 </script>
 </body>
 </html>

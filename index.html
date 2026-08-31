@@ -31,7 +31,7 @@
     font-family:'Inter',sans-serif;
     color:var(--text);
     min-height:100vh;
-    padding-bottom:104px;
+    padding-bottom:230px;
   }
   .display{font-family:'Oswald',sans-serif; letter-spacing:0.02em;}
   .mono{font-family:'JetBrains Mono',monospace;}
@@ -68,10 +68,8 @@
     height:100%; width:0%; background:linear-gradient(90deg,var(--chalk-dim),var(--chalk));
     border-radius:3px; transition:width .3s ease;
   }
-  .header-toggles{
-    display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;
-  }
   .wake-toggle{
+    margin-top:8px;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface-2); border:1px solid var(--border-strong);
     color:var(--text-2); font-family:'JetBrains Mono',monospace;
@@ -320,31 +318,37 @@
   .timer-bar{
     position:fixed; left:0; right:0; bottom:0; z-index:30;
     background:var(--rust); color:#2A1206;
-    padding:12px 16px 14px;
+    padding:18px 20px 22px;
     transform:translateY(100%);
     transition:transform .25s ease;
     box-shadow:0 -8px 24px rgba(0,0,0,0.35);
   }
   .timer-bar.show{transform:translateY(0);}
   .timer-progress-track{
-    height:3px; border-radius:2px; background:rgba(0,0,0,0.22);
-    overflow:hidden; margin-bottom:10px;
+    height:4px; border-radius:2px; background:rgba(0,0,0,0.22);
+    overflow:hidden; margin-bottom:14px;
   }
   .timer-progress-fill{
     height:100%; width:100%; background:#2A1206; border-radius:2px;
     transition:width 1s linear;
   }
-  .timer-top{display:flex; align-items:center; justify-content:space-between;}
-  .timer-top .lbl{font-size:12px; text-transform:uppercase; letter-spacing:0.08em; font-weight:600;}
-  .timer-top .num{font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700; line-height:1;}
-  .timer-controls{display:flex; align-items:center; gap:8px; margin-top:10px;}
+  .timer-lbl{
+    text-align:center; font-size:13px; text-transform:uppercase;
+    letter-spacing:0.14em; font-weight:700;
+  }
+  .timer-num{
+    text-align:center; font-family:'JetBrains Mono',monospace;
+    font-size:84px; font-weight:700; line-height:1;
+    margin:6px 0 18px;
+  }
+  .timer-controls{display:flex; align-items:center; gap:10px;}
   .tbtn{
     background:rgba(0,0,0,0.16); border:none; color:#2A1206;
-    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12px;
-    padding:9px 10px; border-radius:8px; flex:1;
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;
+    padding:16px 10px; border-radius:10px; flex:1;
   }
   .tbtn:active{background:rgba(0,0,0,0.28);}
-  .tbtn.pause-btn{flex:0 0 auto; width:42px; font-size:14px;}
+  .tbtn.pause-btn{flex:0 0 auto; width:56px; font-size:18px;}
   .tbtn.skip{background:rgba(0,0,0,0.28); flex:1.3;}
 
   .timer-flash{
@@ -430,10 +434,7 @@
     <span class="day-fraction mono" id="dayFraction"></span>
   </div>
   <div class="day-progress-bar"><div class="day-progress-fill" id="dayProgressFill"></div></div>
-  <div class="header-toggles">
-    <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
-    <button class="wake-toggle" onclick="testBeep()">Testar som 🔊</button>
-  </div>
+  <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
 </header>
 
 <div class="day-tabs" id="dayTabs"></div>
@@ -442,10 +443,8 @@
 
 <div class="timer-bar" id="timerBar">
   <div class="timer-progress-track"><div class="timer-progress-fill" id="timerProgressFill"></div></div>
-  <div class="timer-top">
-    <div class="lbl">Descanso</div>
-    <div class="num mono" id="timerNum">00:00</div>
-  </div>
+  <div class="timer-lbl">Descanso</div>
+  <div class="timer-num mono" id="timerNum">00:00</div>
   <div class="timer-controls">
     <button class="tbtn" id="minus15Btn">−15</button>
     <button class="tbtn pause-btn" id="pauseBtn">⏸</button>
@@ -1246,14 +1245,6 @@ function scheduleBeep(delaySeconds){
   scheduledBeepOscillators.push(beepToneScheduled(ctx, t0, 0.12, 880));
   scheduledBeepOscillators.push(beepToneScheduled(ctx, t0 + 0.18, 0.12, 880));
 }
-function testBeep(){
-  const ctx = getAudioCtx();
-  if(!ctx) return;
-  const now = ctx.currentTime;
-  beepToneScheduled(ctx, now, 0.12, 880);
-  beepToneScheduled(ctx, now + 0.18, 0.12, 880);
-}
-
 function startTimer(seconds){
   clearInterval(timerInterval);
   timerTotal = seconds;

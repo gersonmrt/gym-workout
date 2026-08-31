@@ -68,8 +68,10 @@
     height:100%; width:0%; background:linear-gradient(90deg,var(--chalk-dim),var(--chalk));
     border-radius:3px; transition:width .3s ease;
   }
+  .header-toggles{
+    display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;
+  }
   .wake-toggle{
-    margin-top:8px;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface-2); border:1px solid var(--border-strong);
     color:var(--text-2); font-family:'JetBrains Mono',monospace;
@@ -428,7 +430,10 @@
     <span class="day-fraction mono" id="dayFraction"></span>
   </div>
   <div class="day-progress-bar"><div class="day-progress-fill" id="dayProgressFill"></div></div>
-  <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
+  <div class="header-toggles">
+    <button class="wake-toggle" id="wakeToggleBtn" onclick="toggleWakeLock()">Tela: OFF</button>
+    <button class="wake-toggle" onclick="testBeep()">Testar som 🔊</button>
+  </div>
 </header>
 
 <div class="day-tabs" id="dayTabs"></div>
@@ -1213,7 +1218,7 @@ function getAudioCtx(){
   if(audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-function beepTone(ctx, startTime, duration, freq){
+function beepToneScheduled(ctx, startTime, duration, freq){
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = 'sine';
@@ -1225,18 +1230,32 @@ function beepTone(ctx, startTime, duration, freq){
   gain.gain.linearRampToValueAtTime(0, startTime + duration);
   osc.start(startTime);
   osc.stop(startTime + duration + 0.02);
+  return osc;
 }
-function playDoubleBeep(){
-  const ctx = audioCtx;
+
+let scheduledBeepOscillators = [];
+function cancelScheduledBeep(){
+  scheduledBeepOscillators.forEach(osc=>{ try{ osc.stop(); }catch(e){} });
+  scheduledBeepOscillators = [];
+}
+function scheduleBeep(delaySeconds){
+  const ctx = getAudioCtx();
+  cancelScheduledBeep();
+  if(!ctx) return;
+  const t0 = ctx.currentTime + Math.max(0, delaySeconds);
+  scheduledBeepOscillators.push(beepToneScheduled(ctx, t0, 0.12, 880));
+  scheduledBeepOscillators.push(beepToneScheduled(ctx, t0 + 0.18, 0.12, 880));
+}
+function testBeep(){
+  const ctx = getAudioCtx();
   if(!ctx) return;
   const now = ctx.currentTime;
-  beepTone(ctx, now, 0.12, 880);
-  beepTone(ctx, now + 0.18, 0.12, 880);
+  beepToneScheduled(ctx, now, 0.12, 880);
+  beepToneScheduled(ctx, now + 0.18, 0.12, 880);
 }
 
 function startTimer(seconds){
   clearInterval(timerInterval);
-  getAudioCtx();
   timerTotal = seconds;
   timerRemaining = seconds;
   timerPaused = false;
@@ -1244,6 +1263,7 @@ function startTimer(seconds){
   const bar = document.getElementById('timerBar');
   bar.classList.add('show');
   updateTimerDisplay();
+  scheduleBeep(seconds);
   timerInterval = setInterval(tickTimer, 1000);
 }
 function tickTimer(){
@@ -1253,7 +1273,6 @@ function tickTimer(){
     document.getElementById('timerBar').classList.remove('show');
     if(navigator.vibrate) navigator.vibrate([120,60,120]);
     flashScreen();
-    playDoubleBeep();
     return;
   }
   updateTimerDisplay();
@@ -1326,6 +1345,7 @@ function adjustTimer(delta){
   timerRemaining = Math.max(0, timerRemaining + delta);
   timerTotal = Math.max(timerTotal, timerRemaining);
   updateTimerDisplay();
+  if(!timerPaused) scheduleBeep(timerRemaining);
 }
 document.getElementById('minus15Btn').onclick = ()=> adjustTimer(-15);
 document.getElementById('plus15Btn').onclick = ()=> adjustTimer(15);
@@ -1334,14 +1354,17 @@ document.getElementById('pauseBtn').onclick = ()=>{
   timerPaused = !timerPaused;
   if(timerPaused){
     clearInterval(timerInterval);
+    cancelScheduledBeep();
     document.getElementById('pauseBtn').textContent = '⏵';
   } else {
     timerInterval = setInterval(tickTimer, 1000);
+    scheduleBeep(timerRemaining);
     document.getElementById('pauseBtn').textContent = '⏸';
   }
 };
 document.getElementById('skipBtn').onclick = ()=>{
   clearInterval(timerInterval);
+  cancelScheduledBeep();
   document.getElementById('timerBar').classList.remove('show');
 };
 
